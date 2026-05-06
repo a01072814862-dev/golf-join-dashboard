@@ -1,5 +1,5 @@
 // API 기본 URL
-const API_BASE_URL = 'https://3000-ia6g3m83x6bmph6zb1b6o-c75d2e49.sg1.manus.computer/api/hotdeal';
+const API_BASE_URL = 'https://3000-i8851c8pzj4040t73pg87-40c28c45.sg1.manus.computer/api/hotdeal';
 
 // 로컬 스토리지 키
 const STORAGE_KEYS = {
