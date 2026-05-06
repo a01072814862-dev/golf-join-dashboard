@@ -1,14 +1,17 @@
+// API 기본 URL
+const API_BASE_URL = 'https://3000-ia6g3m83x6bmph6zb1b6o-c75d2e49.sg1.manus.computer/api/hotdeal';
+
 // 로컬 스토리지 키
 const STORAGE_KEYS = {
+    AUTH_TOKEN: 'golf_join_auth_token',
     HOST_DATA: 'golf_join_host_data',
-    HOT_DEALS: 'golf_join_hot_deals',
-    REQUESTS: 'golf_join_requests',
 };
 
 // 전역 상태
 let currentHost = null;
 let hotDeals = [];
 let requests = [];
+let authToken = null;
 
 // 페이지 초기화
 document.addEventListener('DOMContentLoaded', () => {
@@ -17,16 +20,24 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initializeApp() {
-    // 로컬 스토리지에서 데이터 로드
+    // 로컬 스토리지에서 토큰 로드
+    authToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    
+    if (!authToken) {
+        // 로그인 페이지로 리다이렉트
+        window.location.href = '/pages/login.html';
+        return;
+    }
+    
+    // 호스트 정보 로드
     loadHostData();
-    loadHotDeals();
-    loadRequests();
-
-    // 호스트 정보 표시
-    displayHostInfo();
-
+    
     // 대시보드 표시
     showPage('dashboard');
+    
+    // 데이터 로드
+    loadHotDeals();
+    loadRequests();
 }
 
 function setupEventListeners() {
@@ -38,24 +49,24 @@ function setupEventListeners() {
             showPage(page);
         });
     });
-
+    
     // 로그아웃
     document.getElementById('logoutBtn').addEventListener('click', logout);
-
+    
     // 핫딜 추가 버튼
     document.getElementById('addHotdealBtn').addEventListener('click', openHotdealModal);
     document.getElementById('cancelHotdealBtn').addEventListener('click', closeHotdealModal);
     document.querySelector('.modal-close').addEventListener('click', closeHotdealModal);
-
+    
     // 핫딜 폼 제출
     document.getElementById('hotdealForm').addEventListener('submit', submitHotdeal);
-
+    
     // 상태 필터
     document.getElementById('statusFilter').addEventListener('change', filterRequests);
-
+    
     // 설정 폼
     document.getElementById('settingsForm').addEventListener('submit', saveSettings);
-
+    
     // 모달 외부 클릭 시 닫기
     document.getElementById('hotdealModal').addEventListener('click', (e) => {
         if (e.target.id === 'hotdealModal') {
@@ -70,7 +81,7 @@ function showPage(pageName) {
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
     });
-
+    
     // 네비게이션 업데이트
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
@@ -78,13 +89,13 @@ function showPage(pageName) {
             item.classList.add('active');
         }
     });
-
+    
     // 선택한 페이지 표시
     const pageElement = document.getElementById(`${pageName}-page`);
     if (pageElement) {
         pageElement.classList.add('active');
     }
-
+    
     // 페이지 제목 업데이트
     const titles = {
         dashboard: '대시보드',
@@ -94,7 +105,7 @@ function showPage(pageName) {
         settings: '설정',
     };
     document.getElementById('pageTitle').textContent = titles[pageName] || '';
-
+    
     // 페이지별 데이터 로드
     if (pageName === 'hotdeals') {
         displayHotdeals();
@@ -107,194 +118,116 @@ function showPage(pageName) {
     }
 }
 
+// 대시보드 업데이트
+function updateDashboard() {
+    const totalHotdeals = hotDeals.length;
+    const totalRequests = requests.length;
+    const confirmedRequests = requests.filter(r => r.status === 'confirmed').length;
+    const totalRevenue = hotDeals.reduce((sum, d) => sum + d.discountedPrice, 0);
+    
+    document.querySelector('[data-stat="hotdeals"]').textContent = totalHotdeals;
+    document.querySelector('[data-stat="requests"]').textContent = totalRequests;
+    document.querySelector('[data-stat="confirmed"]').textContent = confirmedRequests;
+    document.querySelector('[data-stat="revenue"]').textContent = `${totalRevenue.toLocaleString()}원`;
+    
+    displayHotdeals();
+    displayRequests();
+}
+
 // 호스트 정보 표시
 function displayHostInfo() {
     if (currentHost) {
-        document.getElementById('userName').textContent = currentHost.name || '호스트';
+        document.getElementById('hostName').textContent = currentHost.name || '호스트';
+        document.getElementById('hostEmail').textContent = currentHost.email || '';
     }
 }
 
-// 대시보드 업데이트
-function updateDashboard() {
-    // 통계 계산
-    const activeHotdeals = hotDeals.filter(d => new Date(d.date) > new Date()).length;
-    const pendingReqs = requests.filter(r => r.status === 'pending').length;
-    const completedDeals = requests.filter(r => r.status === 'confirmed').length;
-    const totalDiscount = hotDeals.reduce((sum, d) => sum + (d.originalPrice - d.discountedPrice), 0);
-
-    // 통계 표시
-    document.getElementById('activeHotdeals').textContent = activeHotdeals;
-    document.getElementById('pendingRequests').textContent = pendingReqs;
-    document.getElementById('completedDeals').textContent = completedDeals;
-    document.getElementById('totalDiscount').textContent = `${totalDiscount.toLocaleString()}원`;
-
-    // 최근 요청 표시
-    displayRecentRequests();
-}
-
-// 최근 요청 표시
-function displayRecentRequests() {
-    const container = document.getElementById('recentRequests');
-    const recentReqs = requests.slice(0, 5);
-
-    if (recentReqs.length === 0) {
-        container.innerHTML = '<p class="empty-state">구매요청이 없습니다</p>';
-        return;
-    }
-
-    container.innerHTML = recentReqs.map(req => `
-        <div class="request-item">
-            <div class="item-header">
-                <div>
-                    <div class="item-title">${req.courseName}</div>
-                    <div style="font-size: 12px; color: #6B7280; margin-top: 4px;">${req.requesterName}</div>
-                </div>
-                <span class="item-status status-${req.status}">${getStatusLabel(req.status)}</span>
-            </div>
-            <div class="item-details">
-                <div class="detail-row">
-                    <span class="detail-label">날짜:</span>
-                    <span class="detail-value">${req.date}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">시간:</span>
-                    <span class="detail-value">${req.time}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">인원:</span>
-                    <span class="detail-value">${req.players}명</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">가격:</span>
-                    <span class="detail-value">${req.price.toLocaleString()}원</span>
-                </div>
-            </div>
-            <div class="item-actions">
-                ${req.status === 'pending' ? `
-                    <button class="btn btn-primary" onclick="confirmRequest('${req.id}')">수락</button>
-                    <button class="btn btn-danger" onclick="rejectRequest('${req.id}')">거절</button>
-                ` : ''}
-            </div>
-        </div>
-    `).join('');
-}
-
-// 핫딜 표시
+// 핫딜 목록 표시
 function displayHotdeals() {
-    const container = document.getElementById('hotdealsList');
-
+    const container = document.getElementById('hotdealsContainer');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
     if (hotDeals.length === 0) {
-        container.innerHTML = '<p class="empty-state">등록된 핫딜이 없습니다</p>';
+        container.innerHTML = '<p style="text-align: center; color: #999;">등록된 핫딜이 없습니다.</p>';
         return;
     }
-
-    container.innerHTML = hotDeals.map(deal => {
-        const discount = ((deal.originalPrice - deal.discountedPrice) / deal.originalPrice * 100).toFixed(0);
-        const isExpired = new Date(deal.date) < new Date();
-
-        return `
-            <div class="hotdeal-item">
-                <div class="item-header">
-                    <div>
-                        <div class="item-title">${deal.courseName}</div>
-                        <div style="font-size: 12px; color: #6B7280; margin-top: 4px;">${deal.courseLocation}</div>
-                    </div>
-                    <span class="item-status ${isExpired ? 'status-cancelled' : 'status-confirmed'}">
-                        ${isExpired ? '만료됨' : '활성'}
-                    </span>
+    
+    hotDeals.forEach(deal => {
+        const discountRate = Math.round(((deal.originalPrice - deal.discountedPrice) / deal.originalPrice) * 100);
+        const html = `
+            <div class="hotdeal-card">
+                <div class="hotdeal-header">
+                    <h3>${deal.courseName}</h3>
+                    <span class="discount-badge">${discountRate}% 할인</span>
                 </div>
-                <div class="item-details">
-                    <div class="detail-row">
-                        <span class="detail-label">날짜:</span>
-                        <span class="detail-value">${deal.date}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">시간:</span>
-                        <span class="detail-value">${deal.time}</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">원가:</span>
-                        <span class="detail-value">${deal.originalPrice.toLocaleString()}원</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">할인가:</span>
-                        <span class="detail-value">${deal.discountedPrice.toLocaleString()}원</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">할인율:</span>
-                        <span class="detail-value" style="color: #EF4444;">${discount}%</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">인원:</span>
-                        <span class="detail-value">${deal.minPlayers}~${deal.maxPlayers}명</span>
-                    </div>
+                <div class="hotdeal-info">
+                    <p><strong>위치:</strong> ${deal.courseLocation || '미지정'}</p>
+                    <p><strong>날짜:</strong> ${deal.date}</p>
+                    <p><strong>시간:</strong> ${deal.time}</p>
+                    <p><strong>가격:</strong> <span class="original-price">${deal.originalPrice.toLocaleString()}원</span> → <span class="discount-price">${deal.discountedPrice.toLocaleString()}원</span></p>
+                    <p><strong>인원:</strong> ${deal.minPlayers}~${deal.maxPlayers}명</p>
+                    <p><strong>설명:</strong> ${deal.description || '-'}</p>
                 </div>
-                <div class="item-actions">
-                    <button class="btn btn-secondary" onclick="editHotdeal('${deal.id}')">수정</button>
-                    <button class="btn btn-danger" onclick="deleteHotdeal('${deal.id}')">삭제</button>
+                <div class="hotdeal-actions">
+                    <button onclick="editHotdeal(${deal.id})" class="btn-edit">수정</button>
+                    <button onclick="deleteHotdeal(${deal.id})" class="btn-delete">삭제</button>
                 </div>
             </div>
         `;
-    }).join('');
+        container.innerHTML += html;
+    });
 }
 
-// 요청 표시
+// 구매요청 목록 표시
 function displayRequests() {
-    const container = document.getElementById('requestsList');
-    const statusFilter = document.getElementById('statusFilter').value;
-    const filteredRequests = statusFilter 
-        ? requests.filter(r => r.status === statusFilter)
-        : requests;
-
+    const container = document.getElementById('requestsContainer');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    const filteredRequests = filterRequestsByStatus();
+    
     if (filteredRequests.length === 0) {
-        container.innerHTML = '<p class="empty-state">구매요청이 없습니다</p>';
+        container.innerHTML = '<p style="text-align: center; color: #999;">구매요청이 없습니다.</p>';
         return;
     }
-
-    container.innerHTML = filteredRequests.map(req => `
-        <div class="request-item">
-            <div class="item-header">
-                <div>
-                    <div class="item-title">${req.courseName}</div>
-                    <div style="font-size: 12px; color: #6B7280; margin-top: 4px;">요청자: ${req.requesterName}</div>
+    
+    filteredRequests.forEach(req => {
+        const statusClass = `status-${req.status}`;
+        const statusLabel = getStatusLabel(req.status);
+        const html = `
+            <div class="request-card ${statusClass}">
+                <div class="request-header">
+                    <h3>${req.courseName}</h3>
+                    <span class="status-badge ${statusClass}">${statusLabel}</span>
                 </div>
-                <span class="item-status status-${req.status}">${getStatusLabel(req.status)}</span>
-            </div>
-            <div class="item-details">
-                <div class="detail-row">
-                    <span class="detail-label">날짜:</span>
-                    <span class="detail-value">${req.date}</span>
+                <div class="request-info">
+                    <p><strong>요청자:</strong> ${req.requesterName}</p>
+                    <p><strong>연락처:</strong> ${req.requesterPhone}</p>
+                    <p><strong>날짜:</strong> ${req.date}</p>
+                    <p><strong>시간:</strong> ${req.time}</p>
+                    <p><strong>인원:</strong> ${req.players}명</p>
+                    <p><strong>가격:</strong> ${req.price.toLocaleString()}원</p>
                 </div>
-                <div class="detail-row">
-                    <span class="detail-label">시간:</span>
-                    <span class="detail-value">${req.time}</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">인원:</span>
-                    <span class="detail-value">${req.players}명</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">가격:</span>
-                    <span class="detail-value">${req.price.toLocaleString()}원</span>
-                </div>
-                <div class="detail-row">
-                    <span class="detail-label">연락처:</span>
-                    <span class="detail-value">${req.requesterPhone}</span>
+                <div class="request-actions">
+                    ${req.status === 'pending' ? `
+                        <button onclick="confirmRequest(${req.id})" class="btn-confirm">수락</button>
+                        <button onclick="rejectRequest(${req.id})" class="btn-reject">거절</button>
+                    ` : ''}
                 </div>
             </div>
-            <div class="item-actions">
-                ${req.status === 'pending' ? `
-                    <button class="btn btn-primary" onclick="confirmRequest('${req.id}')">수락</button>
-                    <button class="btn btn-danger" onclick="rejectRequest('${req.id}')">거절</button>
-                ` : ''}
-            </div>
-        </div>
-    `).join('');
+        `;
+        container.innerHTML += html;
+    });
 }
 
 // 요청 필터링
-function filterRequests() {
-    displayRequests();
+function filterRequestsByStatus() {
+    const filter = document.getElementById('statusFilter')?.value || 'all';
+    if (filter === 'all') return requests;
+    return requests.filter(r => r.status === filter);
 }
 
 // 핫딜 모달 열기
@@ -309,11 +242,10 @@ function closeHotdealModal() {
 }
 
 // 핫딜 제출
-function submitHotdeal(e) {
+async function submitHotdeal(e) {
     e.preventDefault();
-
+    
     const newHotdeal = {
-        id: Date.now().toString(),
         courseName: document.getElementById('courseName').value,
         courseLocation: document.getElementById('courseLocation').value,
         date: document.getElementById('hotdealDate').value,
@@ -323,50 +255,112 @@ function submitHotdeal(e) {
         minPlayers: parseInt(document.getElementById('minPlayers').value),
         maxPlayers: parseInt(document.getElementById('maxPlayers').value),
         description: document.getElementById('hotdealDescription').value,
-        createdAt: new Date().toISOString(),
     };
-
-    hotDeals.push(newHotdeal);
-    saveHotDeals();
-    closeHotdealModal();
-    displayHotdeals();
-    updateDashboard();
-
-    alert('핫딜이 등록되었습니다!');
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/hotdeals`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify(newHotdeal),
+        });
+        
+        if (!response.ok) {
+            throw new Error('핫딜 등록 실패');
+        }
+        
+        closeHotdealModal();
+        await loadHotDeals();
+        updateDashboard();
+        alert('핫딜이 등록되었습니다!');
+    } catch (error) {
+        console.error('Error:', error);
+        alert('핫딜 등록 중 오류가 발생했습니다.');
+    }
 }
 
 // 핫딜 삭제
-function deleteHotdeal(id) {
-    if (confirm('이 핫딜을 삭제하시겠습니까?')) {
-        hotDeals = hotDeals.filter(d => d.id !== id);
-        saveHotDeals();
+async function deleteHotdeal(id) {
+    if (!confirm('이 핫딜을 삭제하시겠습니까?')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/hotdeals/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+            },
+        });
+        
+        if (!response.ok) {
+            throw new Error('핫딜 삭제 실패');
+        }
+        
+        await loadHotDeals();
         displayHotdeals();
         updateDashboard();
+        alert('핫딜이 삭제되었습니다.');
+    } catch (error) {
+        console.error('Error:', error);
+        alert('핫딜 삭제 중 오류가 발생했습니다.');
     }
 }
 
 // 요청 수락
-function confirmRequest(id) {
-    const req = requests.find(r => r.id === id);
-    if (req) {
-        req.status = 'confirmed';
-        saveRequests();
+async function confirmRequest(id) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/requests/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ status: 'confirmed' }),
+        });
+        
+        if (!response.ok) {
+            throw new Error('요청 수락 실패');
+        }
+        
+        const req = requests.find(r => r.id === id);
+        if (req) {
+            alert(`${req.requesterName}님의 요청을 수락했습니다. 연락처: ${req.requesterPhone}`);
+        }
+        
+        await loadRequests();
         displayRequests();
         updateDashboard();
-        alert(`${req.requesterName}님의 요청을 수락했습니다. 연락처: ${req.requesterPhone}`);
+    } catch (error) {
+        console.error('Error:', error);
+        alert('요청 수락 중 오류가 발생했습니다.');
     }
 }
 
 // 요청 거절
-function rejectRequest(id) {
-    if (confirm('이 요청을 거절하시겠습니까?')) {
-        const req = requests.find(r => r.id === id);
-        if (req) {
-            req.status = 'cancelled';
-            saveRequests();
-            displayRequests();
-            updateDashboard();
+async function rejectRequest(id) {
+    if (!confirm('이 요청을 거절하시겠습니까?')) return;
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/requests/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ status: 'cancelled' }),
+        });
+        
+        if (!response.ok) {
+            throw new Error('요청 거절 실패');
         }
+        
+        await loadRequests();
+        displayRequests();
+        updateDashboard();
+    } catch (error) {
+        console.error('Error:', error);
+        alert('요청 거절 중 오류가 발생했습니다.');
     }
 }
 
@@ -380,16 +374,16 @@ function loadSettingsForm() {
 }
 
 // 설정 저장
-function saveSettings(e) {
+async function saveSettings(e) {
     e.preventDefault();
-
+    
     currentHost = {
         ...currentHost,
         name: document.getElementById('hostName').value,
         email: document.getElementById('hostEmail').value,
         phone: document.getElementById('hostPhone').value,
     };
-
+    
     saveHostData();
     displayHostInfo();
     alert('설정이 저장되었습니다!');
@@ -398,8 +392,9 @@ function saveSettings(e) {
 // 로그아웃
 function logout() {
     if (confirm('로그아웃하시겠습니까?')) {
+        localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
         localStorage.removeItem(STORAGE_KEYS.HOST_DATA);
-        window.location.href = '/web/pages/login.html';
+        window.location.href = '/pages/login.html';
     }
 }
 
@@ -413,13 +408,22 @@ function getStatusLabel(status) {
     return labels[status] || status;
 }
 
-// 로컬 스토리지 함수
+// 요청 필터링
+function filterRequests() {
+    displayRequests();
+}
+
+// 호스트 데이터 저장
+function saveHostData() {
+    localStorage.setItem(STORAGE_KEYS.HOST_DATA, JSON.stringify(currentHost));
+}
+
+// 호스트 데이터 로드
 function loadHostData() {
     const data = localStorage.getItem(STORAGE_KEYS.HOST_DATA);
     if (data) {
         currentHost = JSON.parse(data);
     } else {
-        // 테스트용 기본 호스트 데이터
         currentHost = {
             id: 'host_1',
             name: '호스트 관리자',
@@ -428,65 +432,51 @@ function loadHostData() {
         };
         saveHostData();
     }
+    displayHostInfo();
 }
 
-function saveHostData() {
-    localStorage.setItem(STORAGE_KEYS.HOST_DATA, JSON.stringify(currentHost));
-}
-
-function loadHotDeals() {
-    const data = localStorage.getItem(STORAGE_KEYS.HOT_DEALS);
-    if (data) {
-        hotDeals = JSON.parse(data);
-    } else {
-        // 테스트용 샘플 데이터
-        hotDeals = [
-            {
-                id: '1',
-                courseName: 'Forest City Golf Resort',
-                courseLocation: '조호바루',
-                date: '2026-04-28',
-                time: '15:10',
-                originalPrice: 150000,
-                discountedPrice: 100000,
-                minPlayers: 2,
-                maxPlayers: 4,
-                description: '특별 할인 제공',
-                createdAt: new Date().toISOString(),
+// 핫딜 로드 (API에서)
+async function loadHotDeals() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/hotdeals`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
             },
-        ];
-        saveHotDeals();
+        });
+        
+        if (!response.ok) {
+            throw new Error('핫딜 로드 실패');
+        }
+        
+        hotDeals = await response.json();
+        displayHotdeals();
+    } catch (error) {
+        console.error('Error loading hotdeals:', error);
+        // 오류 시 빈 배열로 설정
+        hotDeals = [];
+        displayHotdeals();
     }
 }
 
-function saveHotDeals() {
-    localStorage.setItem(STORAGE_KEYS.HOT_DEALS, JSON.stringify(hotDeals));
-}
-
-function loadRequests() {
-    const data = localStorage.getItem(STORAGE_KEYS.REQUESTS);
-    if (data) {
-        requests = JSON.parse(data);
-    } else {
-        // 테스트용 샘플 데이터
-        requests = [
-            {
-                id: '1',
-                courseName: 'Forest City Golf Resort',
-                date: '2026-04-28',
-                time: '15:10',
-                players: 3,
-                price: 100000,
-                requesterName: '김철수',
-                requesterPhone: '010-1234-5678',
-                status: 'pending',
-                createdAt: new Date().toISOString(),
+// 구매요청 로드 (API에서)
+async function loadRequests() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/requests`, {
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
             },
-        ];
-        saveRequests();
+        });
+        
+        if (!response.ok) {
+            throw new Error('구매요청 로드 실패');
+        }
+        
+        requests = await response.json();
+        displayRequests();
+    } catch (error) {
+        console.error('Error loading requests:', error);
+        // 오류 시 빈 배열로 설정
+        requests = [];
+        displayRequests();
     }
-}
-
-function saveRequests() {
-    localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(requests));
 }
