@@ -187,9 +187,19 @@
                         <label>날짜 *</label>
                         <input type="date" id="hotdealDate" class="form-input" required>
                     </div>
+                </div>
+                <div class="form-row">
                     <div class="form-group">
                         <label>시간 *</label>
-                        <input type="time" id="hotdealTime" class="form-input" required>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="hotdealHour" class="form-input" style="flex: 1;" required>
+                                <option value="">시간 선택</option>
+                            </select>
+                            <span style="font-size: 18px; font-weight: bold;">:</span>
+                            <select id="hotdealMinute" class="form-input" style="flex: 1;" required>
+                                <option value="">분 선택</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="form-row">

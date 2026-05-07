@@ -203,7 +203,7 @@ function displayHotdeals() {
                 </div>
                 <div style="margin-bottom: 12px; font-size: 14px; color: #666;">
                     <p><strong>위치:</strong> ${deal.courseLocation || '미지정'}</p>
-                    <p><strong>날짜:</strong> ${deal.date}</p>
+                    <p><strong>날짜:</strong> ${typeof deal.date === 'string' ? deal.date.split('T')[0] : deal.date}</p>
                     <p><strong>시간:</strong> ${deal.time}</p>
                     <p><strong>가격:</strong> <span style="text-decoration: line-through;">${deal.originalPrice.toLocaleString()}원</span> → <span style="color: #ff6b6b; font-weight: bold;">${deal.discountedPrice.toLocaleString()}원</span></p>
                     <p><strong>인원:</strong> ${deal.minPlayers}~${deal.maxPlayers}명</p>
@@ -313,11 +313,39 @@ function getStatusLabel(status) {
     return labels[status] || status;
 }
 
-// 핫딜 모달 열기
+// 시간/분 선택 드롬단 초기화
+function initializeTimeSelectors() {
+    const hourSelect = document.getElementById('hotdealHour');
+    const minuteSelect = document.getElementById('hotdealMinute');
+    
+    if (hourSelect && hourSelect.children.length === 1) {
+        // 00 ~ 23시 추가
+        for (let i = 0; i < 24; i++) {
+            const option = document.createElement('option');
+            option.value = String(i).padStart(2, '0');
+            option.textContent = String(i).padStart(2, '0') + '시';
+            hourSelect.appendChild(option);
+        }
+    }
+    
+    if (minuteSelect && minuteSelect.children.length === 1) {
+        // 00 ~ 59분 추가
+        for (let i = 0; i < 60; i++) {
+            const option = document.createElement('option');
+            option.value = String(i).padStart(2, '0');
+            option.textContent = String(i).padStart(2, '0') + '분';
+            minuteSelect.appendChild(option);
+        }
+    }
+}
+
+// 핸딕 모달 열기
 function openHotdealModal() {
     const modal = document.getElementById('hotdealModal');
     if (modal) {
         modal.classList.add('active');
+        // 시간/분 선택 초기화
+        initializeTimeSelectors();
     }
 }
 
@@ -333,15 +361,23 @@ function closeHotdealModal() {
     }
 }
 
-// 핫딜 제출
+// 핸딕 제출
 async function submitHotdeal(e) {
     e.preventDefault();
+    
+    const hour = document.getElementById('hotdealHour').value;
+    const minute = document.getElementById('hotdealMinute').value;
+    
+    if (!hour || !minute) {
+        alert('시간과 분을 선택해주세요');
+        return;
+    }
     
     const newHotdeal = {
         courseName: document.getElementById('courseName').value,
         courseLocation: document.getElementById('courseLocation').value,
         date: document.getElementById('hotdealDate').value,
-        time: document.getElementById('hotdealTime').value,
+        time: hour + ':' + minute,
         originalPrice: parseInt(document.getElementById('originalPrice').value),
         discountedPrice: parseInt(document.getElementById('discountedPrice').value),
         minPlayers: parseInt(document.getElementById('minPlayers').value),
@@ -383,8 +419,14 @@ function editHotdeal(id) {
     // 폼에 기존 값 채우기
     document.getElementById('courseName').value = hotdeal.courseName;
     document.getElementById('courseLocation').value = hotdeal.courseLocation;
-    document.getElementById('hotdealDate').value = hotdeal.date;
-    document.getElementById('hotdealTime').value = hotdeal.time;
+    // date 필드에서 ISO 타임스탐프 부분 제거
+    const dateValue = typeof hotdeal.date === 'string' ? hotdeal.date.split('T')[0] : hotdeal.date;
+    document.getElementById('hotdealDate').value = dateValue;
+    if (hotdeal.time) {
+        const [hour, minute] = hotdeal.time.split(':');
+        document.getElementById('hotdealHour').value = hour || '';
+        document.getElementById('hotdealMinute').value = minute || '';
+    }
     document.getElementById('originalPrice').value = hotdeal.originalPrice;
     document.getElementById('discountedPrice').value = hotdeal.discountedPrice;
     document.getElementById('minPlayers').value = hotdeal.minPlayers;
