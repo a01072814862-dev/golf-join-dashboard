@@ -46,6 +46,7 @@ function setupEventListeners() {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const page = item.dataset.page;
+            console.log('Navigating to:', page);
             showPage(page);
         });
     });
@@ -54,29 +55,54 @@ function setupEventListeners() {
     document.getElementById('logoutBtn').addEventListener('click', logout);
     
     // 핫딜 추가 버튼
-    document.getElementById('addHotdealBtn').addEventListener('click', openHotdealModal);
-    document.getElementById('cancelHotdealBtn').addEventListener('click', closeHotdealModal);
-    document.querySelector('.modal-close').addEventListener('click', closeHotdealModal);
+    const addHotdealBtn = document.getElementById('addHotdealBtn');
+    if (addHotdealBtn) {
+        addHotdealBtn.addEventListener('click', openHotdealModal);
+    }
+    
+    const cancelHotdealBtn = document.getElementById('cancelHotdealBtn');
+    if (cancelHotdealBtn) {
+        cancelHotdealBtn.addEventListener('click', closeHotdealModal);
+    }
+    
+    const modalClose = document.querySelector('.modal-close');
+    if (modalClose) {
+        modalClose.addEventListener('click', closeHotdealModal);
+    }
     
     // 핫딜 폼 제출
-    document.getElementById('hotdealForm').addEventListener('submit', submitHotdeal);
+    const hotdealForm = document.getElementById('hotdealForm');
+    if (hotdealForm) {
+        hotdealForm.addEventListener('submit', submitHotdeal);
+    }
     
     // 상태 필터
-    document.getElementById('statusFilter').addEventListener('change', filterRequests);
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', filterRequests);
+    }
     
     // 설정 폼
-    document.getElementById('settingsForm').addEventListener('submit', saveSettings);
+    const settingsForm = document.getElementById('settingsForm');
+    if (settingsForm) {
+        settingsForm.addEventListener('submit', saveSettings);
+    }
     
     // 모달 외부 클릭 시 닫기
-    document.getElementById('hotdealModal').addEventListener('click', (e) => {
-        if (e.target.id === 'hotdealModal') {
-            closeHotdealModal();
-        }
-    });
+    const hotdealModal = document.getElementById('hotdealModal');
+    if (hotdealModal) {
+        hotdealModal.addEventListener('click', (e) => {
+            if (e.target.id === 'hotdealModal') {
+                closeHotdealModal();
+            }
+        });
+    }
 }
 
 // 페이지 전환
 function showPage(pageName) {
+    console.log('showPage called with:', pageName);
+    
     // 모든 페이지 숨기기
     document.querySelectorAll('.page').forEach(page => {
         page.classList.remove('active');
@@ -92,6 +118,7 @@ function showPage(pageName) {
     
     // 선택한 페이지 표시
     const pageElement = document.getElementById(`${pageName}-page`);
+    console.log('Looking for page element:', `${pageName}-page`, pageElement);
     if (pageElement) {
         pageElement.classList.add('active');
     }
@@ -104,7 +131,10 @@ function showPage(pageName) {
         rounds: '라운드 관리',
         settings: '설정',
     };
-    document.getElementById('pageTitle').textContent = titles[pageName] || '';
+    const pageTitle = document.getElementById('pageTitle');
+    if (pageTitle) {
+        pageTitle.textContent = titles[pageName] || '';
+    }
     
     // 페이지별 데이터 로드
     if (pageName === 'hotdeals') {
@@ -123,56 +153,64 @@ function updateDashboard() {
     const totalHotdeals = hotDeals.length;
     const totalRequests = requests.length;
     const confirmedRequests = requests.filter(r => r.status === 'confirmed').length;
-    const totalRevenue = hotDeals.reduce((sum, d) => sum + d.discountedPrice, 0);
+    const totalRevenue = hotDeals.reduce((sum, d) => sum + (d.discountedPrice || 0), 0);
     
-    document.querySelector('[data-stat="hotdeals"]').textContent = totalHotdeals;
-    document.querySelector('[data-stat="requests"]').textContent = totalRequests;
-    document.querySelector('[data-stat="confirmed"]').textContent = confirmedRequests;
-    document.querySelector('[data-stat="revenue"]').textContent = `${totalRevenue.toLocaleString()}원`;
+    const activeHotdeals = document.getElementById('activeHotdeals');
+    if (activeHotdeals) activeHotdeals.textContent = totalHotdeals;
     
-    displayHotdeals();
-    displayRequests();
+    const pendingRequests = document.getElementById('pendingRequests');
+    if (pendingRequests) pendingRequests.textContent = totalRequests - confirmedRequests;
+    
+    const completedDeals = document.getElementById('completedDeals');
+    if (completedDeals) completedDeals.textContent = confirmedRequests;
+    
+    const totalDiscount = document.getElementById('totalDiscount');
+    if (totalDiscount) totalDiscount.textContent = `${totalRevenue.toLocaleString()}원`;
+    
+    displayRecentRequests();
 }
 
 // 호스트 정보 표시
 function displayHostInfo() {
     if (currentHost) {
-        document.getElementById('hostName').textContent = currentHost.name || '호스트';
-        document.getElementById('hostEmail').textContent = currentHost.email || '';
+        const hostName = document.getElementById('hostName');
+        if (hostName) hostName.textContent = currentHost.name || '호스트';
+        
+        const hostEmail = document.getElementById('hostEmail');
+        if (hostEmail) hostEmail.textContent = currentHost.email || '';
     }
 }
 
 // 핫딜 목록 표시
 function displayHotdeals() {
-    const container = document.getElementById('hotdealsContainer');
+    const container = document.getElementById('hotdealsList');
     if (!container) return;
     
     container.innerHTML = '';
     
     if (hotDeals.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #999;">등록된 핫딜이 없습니다.</p>';
+        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">등록된 핫딜이 없습니다.</p>';
         return;
     }
     
     hotDeals.forEach(deal => {
         const discountRate = Math.round(((deal.originalPrice - deal.discountedPrice) / deal.originalPrice) * 100);
         const html = `
-            <div class="hotdeal-card">
-                <div class="hotdeal-header">
-                    <h3>${deal.courseName}</h3>
-                    <span class="discount-badge">${discountRate}% 할인</span>
+            <div class="hotdeal-card" style="border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="margin: 0;">${deal.courseName}</h3>
+                    <span style="background: #ff6b6b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${discountRate}% 할인</span>
                 </div>
-                <div class="hotdeal-info">
+                <div style="margin-bottom: 12px; font-size: 14px; color: #666;">
                     <p><strong>위치:</strong> ${deal.courseLocation || '미지정'}</p>
                     <p><strong>날짜:</strong> ${deal.date}</p>
                     <p><strong>시간:</strong> ${deal.time}</p>
-                    <p><strong>가격:</strong> <span class="original-price">${deal.originalPrice.toLocaleString()}원</span> → <span class="discount-price">${deal.discountedPrice.toLocaleString()}원</span></p>
+                    <p><strong>가격:</strong> <span style="text-decoration: line-through;">${deal.originalPrice.toLocaleString()}원</span> → <span style="color: #ff6b6b; font-weight: bold;">${deal.discountedPrice.toLocaleString()}원</span></p>
                     <p><strong>인원:</strong> ${deal.minPlayers}~${deal.maxPlayers}명</p>
-                    <p><strong>설명:</strong> ${deal.description || '-'}</p>
                 </div>
-                <div class="hotdeal-actions">
-                    <button onclick="editHotdeal(${deal.id})" class="btn-edit">수정</button>
-                    <button onclick="deleteHotdeal(${deal.id})" class="btn-delete">삭제</button>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="editHotdeal(${deal.id})" style="flex: 1; padding: 8px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">수정</button>
+                    <button onclick="deleteHotdeal(${deal.id})" style="flex: 1; padding: 8px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">삭제</button>
                 </div>
             </div>
         `;
@@ -182,7 +220,7 @@ function displayHotdeals() {
 
 // 구매요청 목록 표시
 function displayRequests() {
-    const container = document.getElementById('requestsContainer');
+    const container = document.getElementById('requestsList');
     if (!container) return;
     
     container.innerHTML = '';
@@ -190,33 +228,63 @@ function displayRequests() {
     const filteredRequests = filterRequestsByStatus();
     
     if (filteredRequests.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #999;">구매요청이 없습니다.</p>';
+        container.innerHTML = '<p style="text-align: center; color: #999; padding: 20px;">구매요청이 없습니다.</p>';
         return;
     }
     
     filteredRequests.forEach(req => {
         const statusClass = `status-${req.status}`;
         const statusLabel = getStatusLabel(req.status);
+        const statusColor = req.status === 'pending' ? '#FFA500' : req.status === 'confirmed' ? '#4CAF50' : '#f44336';
+        
         const html = `
-            <div class="request-card ${statusClass}">
-                <div class="request-header">
-                    <h3>${req.courseName}</h3>
-                    <span class="status-badge ${statusClass}">${statusLabel}</span>
+            <div style="border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="margin: 0;">${req.courseName}</h3>
+                    <span style="background: ${statusColor}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${statusLabel}</span>
                 </div>
-                <div class="request-info">
+                <div style="margin-bottom: 12px; font-size: 14px; color: #666;">
                     <p><strong>요청자:</strong> ${req.requesterName}</p>
                     <p><strong>연락처:</strong> ${req.requesterPhone}</p>
-                    <p><strong>날짜:</strong> ${req.date}</p>
-                    <p><strong>시간:</strong> ${req.time}</p>
                     <p><strong>인원:</strong> ${req.players}명</p>
-                    <p><strong>가격:</strong> ${req.price.toLocaleString()}원</p>
                 </div>
-                <div class="request-actions">
-                    ${req.status === 'pending' ? `
-                        <button onclick="confirmRequest(${req.id})" class="btn-confirm">수락</button>
-                        <button onclick="rejectRequest(${req.id})" class="btn-reject">거절</button>
-                    ` : ''}
+                ${req.status === 'pending' ? `
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="confirmRequest(${req.id})" style="flex: 1; padding: 8px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">수락</button>
+                    <button onclick="rejectRequest(${req.id})" style="flex: 1; padding: 8px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">거절</button>
                 </div>
+                ` : ''}
+            </div>
+        `;
+        container.innerHTML += html;
+    });
+}
+
+// 최근 구매요청 표시
+function displayRecentRequests() {
+    const container = document.getElementById('recentRequests');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    const recentRequests = requests.slice(0, 5);
+    
+    if (recentRequests.length === 0) {
+        container.innerHTML = '<p class="empty-state">구매요청이 없습니다</p>';
+        return;
+    }
+    
+    recentRequests.forEach(req => {
+        const statusLabel = getStatusLabel(req.status);
+        const statusColor = req.status === 'pending' ? '#FFA500' : req.status === 'confirmed' ? '#4CAF50' : '#f44336';
+        
+        const html = `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee;">
+                <div>
+                    <p style="margin: 0; font-weight: bold;">${req.courseName}</p>
+                    <p style="margin: 4px 0 0 0; font-size: 12px; color: #666;">${req.requesterName} (${req.requesterPhone})</p>
+                </div>
+                <span style="background: ${statusColor}; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${statusLabel}</span>
             </div>
         `;
         container.innerHTML += html;
@@ -225,20 +293,44 @@ function displayRequests() {
 
 // 요청 필터링
 function filterRequestsByStatus() {
-    const filter = document.getElementById('statusFilter')?.value || 'all';
-    if (filter === 'all') return requests;
+    const filter = document.getElementById('statusFilter')?.value || '';
+    if (filter === '' || filter === 'all') return requests;
     return requests.filter(r => r.status === filter);
+}
+
+// 상태 필터 변경
+function filterRequests() {
+    displayRequests();
+}
+
+// 상태 레이블
+function getStatusLabel(status) {
+    const labels = {
+        pending: '대기 중',
+        confirmed: '확정됨',
+        cancelled: '취소됨'
+    };
+    return labels[status] || status;
 }
 
 // 핫딜 모달 열기
 function openHotdealModal() {
-    document.getElementById('hotdealModal').classList.add('active');
+    const modal = document.getElementById('hotdealModal');
+    if (modal) {
+        modal.classList.add('active');
+    }
 }
 
 // 핫딜 모달 닫기
 function closeHotdealModal() {
-    document.getElementById('hotdealModal').classList.remove('active');
-    document.getElementById('hotdealForm').reset();
+    const modal = document.getElementById('hotdealModal');
+    if (modal) {
+        modal.classList.remove('active');
+    }
+    const form = document.getElementById('hotdealForm');
+    if (form) {
+        form.reset();
+    }
 }
 
 // 핫딜 제출
@@ -267,23 +359,27 @@ async function submitHotdeal(e) {
             body: JSON.stringify(newHotdeal),
         });
         
-        if (!response.ok) {
-            throw new Error('핫딜 등록 실패');
+        if (response.ok) {
+            alert('핫딜이 등록되었습니다!');
+            closeHotdealModal();
+            loadHotDeals();
+        } else {
+            alert('핫딜 등록에 실패했습니다.');
         }
-        
-        closeHotdealModal();
-        await loadHotDeals();
-        updateDashboard();
-        alert('핫딜이 등록되었습니다!');
     } catch (error) {
         console.error('Error:', error);
-        alert('핫딜 등록 중 오류가 발생했습니다.');
+        alert('오류가 발생했습니다.');
     }
+}
+
+// 핫딜 수정
+function editHotdeal(id) {
+    alert('수정 기능은 준비 중입니다.');
 }
 
 // 핫딜 삭제
 async function deleteHotdeal(id) {
-    if (!confirm('이 핫딜을 삭제하시겠습니까?')) return;
+    if (!confirm('정말 삭제하시겠습니까?')) return;
     
     try {
         const response = await fetch(`${API_BASE_URL}/hotdeals/${id}`, {
@@ -293,17 +389,15 @@ async function deleteHotdeal(id) {
             },
         });
         
-        if (!response.ok) {
-            throw new Error('핫딜 삭제 실패');
+        if (response.ok) {
+            alert('삭제되었습니다.');
+            loadHotDeals();
+        } else {
+            alert('삭제에 실패했습니다.');
         }
-        
-        await loadHotDeals();
-        displayHotdeals();
-        updateDashboard();
-        alert('핫딜이 삭제되었습니다.');
     } catch (error) {
         console.error('Error:', error);
-        alert('핫딜 삭제 중 오류가 발생했습니다.');
+        alert('오류가 발생했습니다.');
     }
 }
 
@@ -319,28 +413,20 @@ async function confirmRequest(id) {
             body: JSON.stringify({ status: 'confirmed' }),
         });
         
-        if (!response.ok) {
-            throw new Error('요청 수락 실패');
+        if (response.ok) {
+            alert('요청을 수락했습니다.');
+            loadRequests();
+        } else {
+            alert('수락에 실패했습니다.');
         }
-        
-        const req = requests.find(r => r.id === id);
-        if (req) {
-            alert(`${req.requesterName}님의 요청을 수락했습니다. 연락처: ${req.requesterPhone}`);
-        }
-        
-        await loadRequests();
-        displayRequests();
-        updateDashboard();
     } catch (error) {
         console.error('Error:', error);
-        alert('요청 수락 중 오류가 발생했습니다.');
+        alert('오류가 발생했습니다.');
     }
 }
 
 // 요청 거절
 async function rejectRequest(id) {
-    if (!confirm('이 요청을 거절하시겠습니까?')) return;
-    
     try {
         const response = await fetch(`${API_BASE_URL}/requests/${id}`, {
             method: 'PUT',
@@ -351,114 +437,52 @@ async function rejectRequest(id) {
             body: JSON.stringify({ status: 'cancelled' }),
         });
         
-        if (!response.ok) {
-            throw new Error('요청 거절 실패');
+        if (response.ok) {
+            alert('요청을 거절했습니다.');
+            loadRequests();
+        } else {
+            alert('거절에 실패했습니다.');
         }
-        
-        await loadRequests();
-        displayRequests();
-        updateDashboard();
     } catch (error) {
         console.error('Error:', error);
-        alert('요청 거절 중 오류가 발생했습니다.');
+        alert('오류가 발생했습니다.');
     }
 }
 
-// 설정 폼 로드
-function loadSettingsForm() {
-    if (currentHost) {
-        document.getElementById('hostName').value = currentHost.name || '';
-        document.getElementById('hostEmail').value = currentHost.email || '';
-        document.getElementById('hostPhone').value = currentHost.phone || '';
+// 호스트 정보 로드
+async function loadHostData() {
+    try {
+        const hostData = localStorage.getItem(STORAGE_KEYS.HOST_DATA);
+        if (hostData) {
+            currentHost = JSON.parse(hostData);
+            displayHostInfo();
+        }
+    } catch (error) {
+        console.error('Error loading host data:', error);
     }
 }
 
-// 설정 저장
-async function saveSettings(e) {
-    e.preventDefault();
-    
-    currentHost = {
-        ...currentHost,
-        name: document.getElementById('hostName').value,
-        email: document.getElementById('hostEmail').value,
-        phone: document.getElementById('hostPhone').value,
-    };
-    
-    saveHostData();
-    displayHostInfo();
-    alert('설정이 저장되었습니다!');
-}
-
-// 로그아웃
-function logout() {
-    if (confirm('로그아웃하시겠습니까?')) {
-        localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
-        localStorage.removeItem(STORAGE_KEYS.HOST_DATA);
-        window.location.href = '/pages/login.html';
-    }
-}
-
-// 상태 레이블
-function getStatusLabel(status) {
-    const labels = {
-        pending: '대기 중',
-        confirmed: '확정됨',
-        cancelled: '취소됨',
-    };
-    return labels[status] || status;
-}
-
-// 요청 필터링
-function filterRequests() {
-    displayRequests();
-}
-
-// 호스트 데이터 저장
-function saveHostData() {
-    localStorage.setItem(STORAGE_KEYS.HOST_DATA, JSON.stringify(currentHost));
-}
-
-// 호스트 데이터 로드
-function loadHostData() {
-    const data = localStorage.getItem(STORAGE_KEYS.HOST_DATA);
-    if (data) {
-        currentHost = JSON.parse(data);
-    } else {
-        currentHost = {
-            id: 'host_1',
-            name: '호스트 관리자',
-            email: 'host@example.com',
-            phone: '010-0000-0000',
-        };
-        saveHostData();
-    }
-    displayHostInfo();
-}
-
-// 핫딜 로드 (API에서)
+// 핫딜 목록 로드
 async function loadHotDeals() {
     try {
-        const response = await fetch(`${API_BASE_URL}/hotdeals`, {
+        const response = await fetch(`${API_BASE_URL}/hotdeals/all`, {
             headers: {
                 'Authorization': `Bearer ${authToken}`,
             },
         });
         
-        if (!response.ok) {
-            throw new Error('핫딜 로드 실패');
+        if (response.ok) {
+            hotDeals = await response.json();
+            console.log('Loaded hotdeals:', hotDeals);
+            displayHotdeals();
+            updateDashboard();
         }
-        
-        hotDeals = await response.json();
-        displayHotdeals();
     } catch (error) {
         console.error('Error loading hotdeals:', error);
-        // 오류 시 빈 배열로 설정
-        hotDeals = [];
-        displayHotdeals();
     }
 }
 
-// 구매요청 로드 (API에서)
+// 구매요청 목록 로드
 async function loadRequests() {
     try {
         const response = await fetch(`${API_BASE_URL}/requests`, {
@@ -467,16 +491,37 @@ async function loadRequests() {
             },
         });
         
-        if (!response.ok) {
-            throw new Error('구매요청 로드 실패');
+        if (response.ok) {
+            requests = await response.json();
+            console.log('Loaded requests:', requests);
+            displayRequests();
+            updateDashboard();
         }
-        
-        requests = await response.json();
-        displayRequests();
     } catch (error) {
         console.error('Error loading requests:', error);
-        // 오류 시 빈 배열로 설정
-        requests = [];
-        displayRequests();
     }
+}
+
+// 설정 폼 로드
+function loadSettingsForm() {
+    if (currentHost) {
+        const hostNameInput = document.getElementById('hostNameInput');
+        if (hostNameInput) hostNameInput.value = currentHost.name || '';
+        
+        const hostPhoneInput = document.getElementById('hostPhoneInput');
+        if (hostPhoneInput) hostPhoneInput.value = currentHost.phone || '';
+    }
+}
+
+// 설정 저장
+async function saveSettings(e) {
+    e.preventDefault();
+    alert('설정 저장 기능은 준비 중입니다.');
+}
+
+// 로그아웃
+function logout() {
+    localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.HOST_DATA);
+    window.location.href = '/pages/login.html';
 }
