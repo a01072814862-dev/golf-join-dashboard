@@ -374,7 +374,76 @@ async function submitHotdeal(e) {
 
 // 핫딜 수정
 function editHotdeal(id) {
-    alert('수정 기능은 준비 중입니다.');
+    const hotdeal = hotDeals.find(d => d.id === id);
+    if (!hotdeal) {
+        alert('핫딜을 찾을 수 없습니다.');
+        return;
+    }
+    
+    // 폼에 기존 값 채우기
+    document.getElementById('courseName').value = hotdeal.courseName;
+    document.getElementById('courseLocation').value = hotdeal.courseLocation;
+    document.getElementById('hotdealDate').value = hotdeal.date;
+    document.getElementById('hotdealTime').value = hotdeal.time;
+    document.getElementById('originalPrice').value = hotdeal.originalPrice;
+    document.getElementById('discountedPrice').value = hotdeal.discountedPrice;
+    document.getElementById('minPlayers').value = hotdeal.minPlayers;
+    document.getElementById('maxPlayers').value = hotdeal.maxPlayers;
+    document.getElementById('hotdealDescription').value = hotdeal.description || '';
+    
+    // 폼의 제출 함수를 수정 모드로 변경
+    const form = document.getElementById('hotdealForm');
+    if (form) {
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            await updateHotdeal(id);
+        };
+    }
+    
+    // 모달 열기
+    openHotdealModal();
+}
+
+// 핫딜 업데이트
+async function updateHotdeal(id) {
+    const updatedHotdeal = {
+        courseName: document.getElementById('courseName').value,
+        courseLocation: document.getElementById('courseLocation').value,
+        date: document.getElementById('hotdealDate').value,
+        time: document.getElementById('hotdealTime').value,
+        originalPrice: parseInt(document.getElementById('originalPrice').value),
+        discountedPrice: parseInt(document.getElementById('discountedPrice').value),
+        minPlayers: parseInt(document.getElementById('minPlayers').value),
+        maxPlayers: parseInt(document.getElementById('maxPlayers').value),
+        description: document.getElementById('hotdealDescription').value,
+    };
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/hotdeals/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify(updatedHotdeal),
+        });
+        
+        if (response.ok) {
+            alert('핫딜이 수정되었습니다!');
+            closeHotdealModal();
+            loadHotDeals();
+            // 폼의 제출 함수를 원래대로 복원
+            const form = document.getElementById('hotdealForm');
+            if (form) {
+                form.onsubmit = submitHotdeal;
+            }
+        } else {
+            alert('수정에 실패했습니다.');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('오류가 발생했습니다.');
+    }
 }
 
 // 핫딜 삭제
